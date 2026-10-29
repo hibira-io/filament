@@ -13,6 +13,10 @@
     x-data="{
         channel: @js($channel),
         items: @js($running),
+        labels: @js([
+            'import' => __('hibira-filament::progress.import', ['file' => '__FILE__']),
+            'export' => __('hibira-filament::progress.export', ['file' => '__FILE__']),
+        ]),
         init() {
             const listen = () => {
                 if (! window.Echo) return false
@@ -31,6 +35,9 @@
             // Filament's own notification says when it is done.
             if (item.done) setTimeout(() => (this.items = this.items.filter((i) => i.key !== item.key)), 4000)
         },
+        label(item) {
+            return (this.labels[item.kind] ?? '__FILE__').replace('__FILE__', item.file)
+        },
         percent(item) {
             return item.total > 0 ? Math.round((item.processed / item.total) * 100) : 0
         },
@@ -44,7 +51,7 @@
 >
     <template x-for="item in items" x-bind:key="item.key">
         <div class="hibira-progress-item">
-            <div x-text="item.label" style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"></div>
+            <div x-text="label(item)" style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"></div>
             <div class="hibira-progress-track">
                 <div class="hibira-progress-bar" x-bind:style="{ width: percent(item) + '%', background: item.done ? '#10b981' : undefined }"></div>
             </div>
