@@ -44,6 +44,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set('database.default', 'testing');
         $app['config']->set('cache.default', 'array');
+        $app['config']->set('queue.default', 'sync');
         $app['config']->set('broadcasting.default', 'hibira');
         $app['config']->set('auth.providers.users.model', Fixtures\User::class);
         $app['config']->set('hibira.app_id', '1001');
@@ -65,6 +66,32 @@ abstract class TestCase extends Orchestra
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
             $table->string('title');
+            $table->timestamps();
+        });
+
+        Schema::create('imports', function (Blueprint $table) {
+            $table->id();
+            $table->timestamp('completed_at')->nullable();
+            $table->string('file_name');
+            $table->string('file_path');
+            $table->string('importer');
+            $table->unsignedInteger('processed_rows')->default(0);
+            $table->unsignedInteger('total_rows');
+            $table->unsignedInteger('successful_rows')->default(0);
+            $table->foreignId('user_id');
+            $table->timestamps();
+        });
+
+        Schema::create('exports', function (Blueprint $table) {
+            $table->id();
+            $table->timestamp('completed_at')->nullable();
+            $table->string('file_disk');
+            $table->string('file_name')->nullable();
+            $table->string('exporter');
+            $table->unsignedInteger('processed_rows')->default(0);
+            $table->unsignedInteger('total_rows');
+            $table->unsignedInteger('successful_rows')->default(0);
+            $table->foreignId('user_id');
             $table->timestamps();
         });
 

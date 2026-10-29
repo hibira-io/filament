@@ -8,7 +8,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Broadcast;
 
 /**
- * Presence channels for "who's here" avatars and record locks.
+ * Channels for "who's here" avatars, record locks, live tables and job
+ * progress.
  *
  * Page rooms are named by the browser from the page path, so the server only
  * checks that the user may use the panel. Lock rooms are named by the server.
@@ -35,6 +36,10 @@ class Presence
 
         Broadcast::channel('hibira.{panel}.page.{room}', $authorize, $options);
         Broadcast::channel('hibira.{panel}.lock.{room}', $authorize, $options);
+        Broadcast::channel('hibira.{panel}.table.{model}', $authorize, $options);
+        Broadcast::channel('hibira.{panel}.user.{id}', function ($user, string $panel, string $id) {
+            return (string) $user->getAuthIdentifier() === $id && static::member($panel, $user) !== false;
+        }, $options);
     }
 
     /**
@@ -71,6 +76,18 @@ class Presence
     public static function lockChannel(string $panelId, string $subject): string
     {
         return "hibira.{$panelId}.lock.".substr(sha1($subject), 0, 24);
+    }
+
+    /** Laravel channel name (without the private- prefix) told when a model's table changes. */
+    public static function tableChannel(string $panelId, string $model): string
+    {
+        return "hibira.{$panelId}.table.".substr(sha1($model), 0, 24);
+    }
+
+    /** Laravel channel name (without the private- prefix) of one user's job progress. */
+    public static function userChannel(string $panelId, int | string $userId): string
+    {
+        return "hibira.{$panelId}.user.{$userId}";
     }
 
     /**

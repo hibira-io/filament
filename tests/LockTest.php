@@ -120,7 +120,7 @@ class LockTest extends TestCase
         $ada->call('handOverHibiraLock', (string) $this->bob->id, 'Bob')
             ->assertSet('hibiraLockHolder.id', (string) $this->bob->id);
 
-        $this->assertSame('hibira-lock-changed', end($this->triggered)[1]);
+        $this->assertContains('hibira-lock-changed', array_column($this->triggered, 1));
 
         $this->editAs($this->bob)->assertSet('hibiraLockHolder.id', (string) $this->bob->id);
     }
