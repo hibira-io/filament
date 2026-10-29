@@ -16,6 +16,11 @@ settings the rest of your app uses, and adds:
   whether the browser is connected.
 - **A live channels widget** for the dashboard: channels in use, presence
   channels and the members in them.
+- **Who's here.** Avatars in the page header show who else has the same page
+  open.
+- **Edit locks.** One person edits a record at a time. Others see who holds
+  it, can ask for it, and get it as soon as the holder hands it over or
+  leaves, with no heartbeat polling and no lock table.
 
 Supports Filament 3, 4 and 5. It builds on
 [hibira-io/laravel](https://github.com/hibira-io/laravel), which sets up
@@ -160,6 +165,56 @@ use Hibira\Filament\Widgets\HibiraChannelsWidget;
 
 $panel->widgets([HibiraChannelsWidget::class]);
 ```
+
+## Who's here
+
+`->presence()` shows the avatars of everyone else on the same page, next to
+the page's header actions. Each page path is its own room, so people on the
+posts list don't show up on a post's edit page.
+
+```php
+HibiraPlugin::make()->presence()
+```
+
+The plugin registers the presence channels itself and lets in anyone who may
+use the panel (the same `canAccessPanel()` check Filament makes). Echo joins
+them through `/broadcasting/auth`, so the broadcasting routes need to be on,
+as for [live notifications](#live-database-notifications). Move the avatars
+with `->presence(renderHook: PanelsRenderHook::TOPBAR_END)`.
+
+## Edit locks
+
+Add `InteractsWithHibiraLock` to an edit page:
+
+```php
+use Filament\Resources\Pages\EditRecord;
+use Hibira\Filament\Concerns\InteractsWithHibiraLock;
+
+class EditPost extends EditRecord
+{
+    use InteractsWithHibiraLock;
+
+    protected static string $resource = PostResource::class;
+}
+```
+
+The first person to open a record holds its lock. Anyone else who opens it
+sees who is editing, and Save is turned off for them. They can:
+
+- **Ask to edit.** The holder gets a prompt with **Save and hand over**,
+  which saves the holder's changes and passes the lock across.
+- **Wait.** When the holder closes the page, the next person on it takes the
+  lock within a few seconds.
+
+Everyone on the edit page joins a presence channel for that record. When the
+holder's connection drops, Hibira tells the others, and the server checks
+Hibira's member list before moving the lock, so a stale lock never blocks
+anyone and nothing polls. If Hibira can't be reached, the lock stays where it
+is.
+
+The holder is kept in your cache store, so use one that supports atomic
+locks (`redis`, `database`, `memcached`, `dynamodb`, `file` or `array`).
+Presence for locks works with or without `->presence()`.
 
 ## Echo options
 

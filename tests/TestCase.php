@@ -43,6 +43,7 @@ abstract class TestCase extends Orchestra
     {
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set('database.default', 'testing');
+        $app['config']->set('cache.default', 'array');
         $app['config']->set('broadcasting.default', 'hibira');
         $app['config']->set('auth.providers.users.model', Fixtures\User::class);
         $app['config']->set('hibira.app_id', '1001');
@@ -58,6 +59,12 @@ abstract class TestCase extends Orchestra
             $table->string('email');
             $table->string('password');
             $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
             $table->timestamps();
         });
 

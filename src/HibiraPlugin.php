@@ -3,11 +3,14 @@
 namespace Hibira\Filament;
 
 use Filament\Contracts\Plugin;
+use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
+use Hibira\Filament\Concerns\InteractsWithHibiraLock;
 use Hibira\Filament\Widgets\HibiraChannelsWidget;
 use Hibira\Laravel\Hibira;
+use Livewire\Livewire;
 
 /**
  * Points a Filament panel's Laravel Echo client at Hibira.
@@ -26,6 +29,10 @@ class HibiraPlugin implements Plugin
     protected string $connectionStatusHook = PanelsRenderHook::USER_MENU_BEFORE;
 
     protected bool $hasChannelsWidget = false;
+
+    protected bool $hasPresence = false;
+
+    protected string $presenceHook = PanelsRenderHook::PAGE_HEADER_ACTIONS_BEFORE;
 
     /** @var array<string, mixed> */
     protected array $echoOptions = [];
@@ -79,6 +86,18 @@ class HibiraPlugin implements Plugin
         return $this;
     }
 
+    /** Shows the avatars of the other users on the same page. */
+    public function presence(bool $condition = true, ?string $renderHook = null): static
+    {
+        $this->hasPresence = $condition;
+
+        if ($renderHook !== null) {
+            $this->presenceHook = $renderHook;
+        }
+
+        return $this;
+    }
+
     /**
      * Extra or replaced Laravel Echo options, such as authEndpoint.
      *
@@ -106,6 +125,13 @@ class HibiraPlugin implements Plugin
         if ($this->hasChannelsWidget) {
             $panel->widgets([HibiraChannelsWidget::class]);
         }
+
+        // Channels are authorized on /broadcasting/auth, outside the panel,
+        // so they are registered for every request. After boot, so the
+        // hibira broadcaster exists.
+        app()->booted(function () use ($panel) {
+            Presence::registerChannels($panel->getId(), $panel->getAuthGuard());
+        });
     }
 
     public function boot(Panel $panel): void
@@ -124,6 +150,34 @@ class HibiraPlugin implements Plugin
                 fn (): string => view('hibira-filament::connection-status')->render(),
             );
         }
+
+        if ($this->hasPresence) {
+            FilamentView::registerRenderHook(
+                $this->presenceHook,
+                fn (): string => Filament::auth()->check()
+                    ? view('hibira-filament::presence-avatars', [
+                        'panel' => $panel->getId(),
+                        'me' => Filament::auth()->id(),
+                        'max' => 5,
+                    ])->render()
+                    : '',
+            );
+        }
+
+        FilamentView::registerRenderHook(PanelsRenderHook::PAGE_START, function (): string {
+            $page = Livewire::current();
+
+            if (! $page || ! in_array(InteractsWithHibiraLock::class, class_uses_recursive($page), true)) {
+                return '';
+            }
+
+            return view('hibira-filament::lock-banner', [
+                'channel' => $page->getHibiraLockChannel(),
+                'me' => (string) Filament::auth()->id(),
+                'holder' => $page->hibiraLockHolder,
+                'holds' => $page->holdsHibiraLock(),
+            ])->render();
+        });
     }
 
     /** @return array<string, mixed> */

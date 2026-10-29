@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- `presence()`: avatars in the page header show who else has the page open.
+- `InteractsWithHibiraLock` for edit pages: one person edits a record at a
+  time, others can ask for it and the holder can save and hand it over. The
+  lock moves on when its holder leaves, using Hibira presence instead of
+  heartbeat polling.
+
 ## 0.1.0
 
 First release.
