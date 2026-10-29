@@ -38,7 +38,13 @@ jobs:
           extensions: intl
           coverage: none
       - name: Install
+        env:
+          COMPOSER_NO_SECURITY_BLOCKING: "1"
         run: |
+          # Older Laravel and Filament releases have security advisories, and
+          # Composer refuses those by default. They are tested on purpose;
+          # apps choose their own versions.
+          php -r '$c = json_decode(file_get_contents("composer.json"), true); $c["config"]["audit"]["block-insecure"] = false; $c["config"]["policy"]["advisories"]["block"] = false; file_put_contents("composer.json", json_encode($c, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));'
           composer require "filament/filament:${{ matrix.filament }}" --no-interaction --no-update
           composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
           composer update --prefer-dist --no-interaction --no-progress --with-all-dependencies
