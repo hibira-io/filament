@@ -6,6 +6,12 @@ use Illuminate\Support\ServiceProvider;
 
 class HibiraFilamentServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->singleton(LiveTables::class);
+        $this->app->singleton(JobProgress::class);
+    }
+
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'hibira-filament');

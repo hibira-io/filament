@@ -25,7 +25,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->pages([Dashboard::class])
-            ->plugin(HibiraPlugin::make()->databaseNotifications()->channelsWidget())
+            ->resources([PostResource::class])
+            ->plugin(HibiraPlugin::make()->databaseNotifications()->channelsWidget()->presence()->liveTables()->importProgress()->chat())
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

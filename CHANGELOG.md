@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0
+
+- `presence()`: avatars in the page header show who else has the page open.
+- `InteractsWithHibiraLock` for edit pages: one person edits a record at a
+  time, others can ask for it and the holder can save and hand it over. The
+  lock moves on when its holder leaves, using Hibira presence instead of
+  heartbeat polling.
+- `liveTables()`: resource tables refresh for everyone who has them open when
+  records are saved, deleted or restored, anywhere in the app. Changes are
+  sent once per request or queued job.
+- `importProgress()`: a progress card for the user's running imports and
+  exports, updated after each chunk of rows.
+- `chat()`: a Chat page for the panel's users, one to one or in groups, with
+  unread counts in the top bar, online status and message history, stored by
+  Hibira's Chat API.
+
 ## 0.1.0
 
 First release.

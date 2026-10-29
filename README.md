@@ -16,6 +16,17 @@ settings the rest of your app uses, and adds:
   whether the browser is connected.
 - **A live channels widget** for the dashboard: channels in use, presence
   channels and the members in them.
+- **Who's here.** Avatars in the page header show who else has the same page
+  open.
+- **Edit locks.** One person edits a record at a time. Others see who holds
+  it, can ask for it, and get it as soon as the holder hands it over or
+  leaves, with no heartbeat polling and no lock table.
+- **Live tables.** Resource tables refresh for everyone who has them open
+  when records are saved or deleted, instead of polling.
+- **Import and export progress.** A progress bar shows how many rows of an
+  import or export are done, chunk by chunk.
+- **Team chat.** A Chat page for the panel's users, one to one or in
+  groups, with unread counts, online status and message history.
 
 Supports Filament 3, 4 and 5. It builds on
 [hibira-io/laravel](https://github.com/hibira-io/laravel), which sets up
@@ -160,6 +171,138 @@ use Hibira\Filament\Widgets\HibiraChannelsWidget;
 
 $panel->widgets([HibiraChannelsWidget::class]);
 ```
+
+## Who's here
+
+`->presence()` shows the avatars of everyone else on the same page, next to
+the page's header actions. Each page path is its own room, so people on the
+posts list don't show up on a post's edit page.
+
+```php
+HibiraPlugin::make()->presence()
+```
+
+The plugin registers the presence channels itself and lets in anyone who may
+use the panel (the same `canAccessPanel()` check Filament makes). Echo joins
+them through `/broadcasting/auth`, so the broadcasting routes need to be on,
+as for [live notifications](#live-database-notifications). Move the avatars
+with `->presence(renderHook: PanelsRenderHook::TOPBAR_END)`.
+
+## Edit locks
+
+Add `InteractsWithHibiraLock` to an edit page:
+
+```php
+use Filament\Resources\Pages\EditRecord;
+use Hibira\Filament\Concerns\InteractsWithHibiraLock;
+
+class EditPost extends EditRecord
+{
+    use InteractsWithHibiraLock;
+
+    protected static string $resource = PostResource::class;
+}
+```
+
+The first person to open a record holds its lock. Anyone else who opens it
+sees who is editing, and Save is turned off for them. They can:
+
+- **Ask to edit.** The holder gets a prompt with **Save and hand over**,
+  which saves the holder's changes and passes the lock across.
+- **Wait.** When the holder closes the page, the next person on it takes the
+  lock within a few seconds.
+
+Everyone on the edit page joins a presence channel for that record. When the
+holder's connection drops, Hibira tells the others, and the server checks
+Hibira's member list before moving the lock, so a stale lock never blocks
+anyone and nothing polls. If Hibira can't be reached, the lock stays where it
+is.
+
+The holder is kept in your cache store, so use one that supports atomic
+locks (`redis`, `database`, `memcached`, `dynamodb`, `file` or `array`).
+Presence for locks works with or without `->presence()`.
+
+## Live tables
+
+`->liveTables()` refreshes a resource's list page for everyone who has it
+open, whenever one of its records is created, updated, deleted or restored:
+in the panel, in a queued job, an API controller or a console command.
+
+```php
+HibiraPlugin::make()->liveTables()
+```
+
+Changes are collected and sent once when the request or queued job ends, so
+an import of a thousand rows refreshes each open table once per chunk, not a
+thousand times. Browsers wait 300 ms after the last message before
+refreshing.
+
+The plugin watches the models of the panel's resources. For pages whose
+table lists another model, pass it:
+
+```php
+HibiraPlugin::make()->liveTables(models: [AuditEntry::class])
+```
+
+Only Eloquent model events are seen. After a mass update through the query
+builder, mark the table yourself:
+
+```php
+Post::query()->where('draft', true)->update(['draft' => false]);
+
+app(\Hibira\Filament\LiveTables::class)->touch(Post::class);
+```
+
+## Import and export progress
+
+Filament runs imports and exports as queued jobs and tells you when they are
+finished. `->importProgress()` also shows how far along they are: a small
+card in the corner fills up as each chunk of rows is processed, and goes
+away a few seconds after the last one.
+
+```php
+HibiraPlugin::make()->importProgress()
+```
+
+It works with Filament's own `ImportAction` and `ExportAction`, including
+custom importers and exporters, and picks up imports that were already
+running when the page loads. The card only goes to the user who started the
+import.
+
+## Team chat
+
+`->chat()` adds a **Chat** page and a chat button with the unread count to
+the top bar. Panel users can message each other one to one or start a group,
+see who is online, and scroll back through earlier messages.
+
+```php
+HibiraPlugin::make()->chat()
+```
+
+Messages are stored by Hibira's Chat API, so there are no tables to migrate
+and nothing to queue. The Chat API is in beta and is turned on per account:
+ask us at [hibira.io](https://hibira.io) to turn it on. Until then the Chat
+page says chat is unavailable.
+
+How it fits together:
+
+- Each browser signs in to Hibira as its panel user, through a route the
+  plugin adds to the panel (`/admin/hibira/user-auth`). New messages, read
+  receipts and online status arrive over that sign-in, with no channel per
+  conversation.
+- Anyone who may use the panel (`canAccessPanel()`) can chat. Users are
+  found by `name` and `email`; pass other columns with
+  `->chat(searchColumns: ['name', 'username'])`.
+- Chat users are named `<panel>.<user key>`, so each panel has its own
+  conversations.
+- A group holds up to 50 people. Messages are up to 4,000 characters.
+
+Hide the page from the navigation with `->chat(navigation: false)` (the top
+bar button still links to it), or move the button with
+`->chat(buttonRenderHook: PanelsRenderHook::TOPBAR_END)`.
+
+Every message counts as one message per member toward your plan, like any
+other event.
 
 ## Echo options
 

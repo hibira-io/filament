@@ -62,7 +62,7 @@ class ChannelsWidgetTest extends TestCase
     {
         $dir = __DIR__.'/../resources/lang';
 
-        foreach (['connection', 'widget'] as $file) {
+        foreach (['connection', 'widget', 'presence', 'lock', 'progress', 'chat'] as $file) {
             $keys = array_keys(require "{$dir}/en/{$file}.php");
 
             foreach (glob("{$dir}/*/{$file}.php") as $path) {

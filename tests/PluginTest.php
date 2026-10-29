@@ -32,7 +32,8 @@ class PluginTest extends TestCase
             'enabledTransports' => ['ws', 'wss'],
             'disableStats' => true,
             'authEndpoint' => '/broadcasting/auth',
-        ], config('filament.broadcasting.echo'));
+            'userAuthentication' => ['endpoint' => '/admin/hibira/user-auth', 'transport' => 'ajax', 'headers' => []],
+        ], json_decode(json_encode(config('filament.broadcasting.echo')), true));
     }
 
     public function test_database_notifications_arrive_live_without_polling()
