@@ -95,11 +95,13 @@ class JobProgress
         $total = (int) $record->total_rows;
         $processed = min((int) $record->processed_rows, $total);
 
+        $kind = $record instanceof Import ? 'import' : 'export';
+
+        // Sent from a queue worker, so the browser words it in its own language.
         return [
-            'key' => ($record instanceof Import ? 'import-' : 'export-').$record->getKey(),
-            'label' => __('hibira-filament::progress.'.($record instanceof Import ? 'import' : 'export'), [
-                'file' => $record->file_name,
-            ]),
+            'key' => $kind.'-'.$record->getKey(),
+            'kind' => $kind,
+            'file' => (string) $record->file_name,
             'processed' => $processed,
             'total' => $total,
             'done' => $record->completed_at !== null || ($total > 0 && $processed >= $total),

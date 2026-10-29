@@ -68,7 +68,8 @@ class JobProgressTest extends TestCase
         $this->assertSame(['private-'.Presence::userChannel('admin', $this->ada->id)], $channels);
         $this->assertSame([
             'key' => 'import-'.$this->import->id,
-            'label' => 'Importing posts.csv',
+            'kind' => 'import',
+            'file' => 'posts.csv',
             'processed' => 400,
             'total' => 1000,
             'done' => false,
@@ -112,6 +113,7 @@ class JobProgressTest extends TestCase
             ->assertOk()
             ->assertSee('data-hibira-progress', false)
             ->assertSee(Presence::userChannel('admin', $this->ada->id), false)
-            ->assertSee('Importing posts.csv');
+            ->assertSee('posts.csv')
+            ->assertSee('Importing __FILE__');
     }
 }
