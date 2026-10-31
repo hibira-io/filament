@@ -20,7 +20,7 @@ use Throwable;
  */
 trait InteractsWithHibiraLock
 {
-    /** @var array{id: string, name: string}|null */
+    /** @var array{id: string, name: string, avatar?: string, agent?: true}|null */
     public ?array $hibiraLockHolder = null;
 
     public function mountInteractsWithHibiraLock(): void
@@ -33,6 +33,7 @@ trait InteractsWithHibiraLock
     {
         $key = $this->getHibiraLockCacheKey();
         $me = $this->getHibiraLockMe();
+        $previous = $this->hibiraLockHolder;
 
         Cache::lock($key.':claim', 5)->block(5, function () use ($key, $me) {
             $holder = Cache::get($key);
@@ -44,6 +45,18 @@ trait InteractsWithHibiraLock
 
             $this->hibiraLockHolder = $holder;
         });
+
+        // Someone else held the record while this page was open, and may
+        // have changed it, so show their changes before ours can be saved.
+        if ($previous !== null && $previous['id'] !== $me['id'] && $this->holdsHibiraLock()) {
+            $this->getRecord()->refresh();
+            $this->fillForm();
+
+            Notification::make()
+                ->title(__('hibira-filament::lock.reloaded'))
+                ->info()
+                ->send();
+        }
     }
 
     /** Asks the holder to hand the record over. */
@@ -66,11 +79,18 @@ trait InteractsWithHibiraLock
 
         $this->save(shouldRedirect: false, shouldSendSavedNotification: false);
 
-        $holder = ['id' => $userId, 'name' => $name];
+        $holder = Presence::agentsIn($this->getHibiraLockChannel())[$userId] ?? ['id' => $userId, 'name' => $name];
+        unset($holder['until']);
         Cache::put($this->getHibiraLockCacheKey(), $holder, $this->getHibiraLockTtl());
         $this->hibiraLockHolder = $holder;
 
         $this->triggerHibiraLockEvent('hibira-lock-changed', $holder);
+    }
+
+    /** Whether an AI agent holds the lock, see Hibira\Filament\Agents\Agent. */
+    public function hibiraLockHeldByAgent(): bool
+    {
+        return (bool) ($this->hibiraLockHolder['agent'] ?? false);
     }
 
     public function holdsHibiraLock(): bool
@@ -110,7 +130,7 @@ trait InteractsWithHibiraLock
 
     protected function getHibiraLockCacheKey(): string
     {
-        return 'hibira-filament:'.$this->getHibiraLockChannel();
+        return Presence::lockCacheKey($this->getHibiraLockChannel());
     }
 
     /** How long a lock outlives its holder when nobody else comes by. */
@@ -129,14 +149,8 @@ trait InteractsWithHibiraLock
 
     protected function isPresentInHibiraLock(string $userId): bool
     {
-        try {
-            return in_array($userId, Presence::usersIn($this->getHibiraLockChannel()), true);
-        } catch (Throwable $e) {
-            // If Hibira can't be reached, keep the lock where it is.
-            Log::warning('Hibira lock: '.$e->getMessage());
-
-            return true;
-        }
+        // If Hibira can't be reached, the lock stays where it is.
+        return Presence::isHere($this->getHibiraLockChannel(), $userId);
     }
 
     /** @param  array<string, mixed>  $data */

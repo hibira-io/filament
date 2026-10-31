@@ -8,4 +8,6 @@ return [
     'hand_over' => '保存并交给对方',
     'dismiss' => '暂不',
     'save_blocked' => ':name 正在编辑这条记录，你的修改没有保存。',
+    'held_by_agent' => ':name（AI 代理）正在编辑这条记录。完成前无法保存，完成后会在这里载入它的修改。',
+    'reloaded' => '现在可以编辑了，已载入最新的修改。',
 ];

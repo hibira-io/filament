@@ -279,6 +279,11 @@ class HibiraPlugin implements Plugin
                         'panel' => $panel->getId(),
                         'me' => Filament::auth()->id(),
                         'max' => 5,
+                        // Only full page loads matter: Livewire updates keep the first render.
+                        'agents' => Presence::agentsIn(Presence::pageChannel(
+                            $panel->getId(),
+                            request()->getBaseUrl().request()->getPathInfo(),
+                        )),
                     ])->render()
                     : '',
             );
@@ -296,6 +301,7 @@ class HibiraPlugin implements Plugin
                 'me' => (string) Filament::auth()->id(),
                 'holder' => $page->hibiraLockHolder,
                 'holds' => $page->holdsHibiraLock(),
+                'agent' => $page->hibiraLockHeldByAgent(),
             ])->render();
         });
 

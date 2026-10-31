@@ -8,4 +8,6 @@ return [
     'hand_over' => 'Save and hand over',
     'dismiss' => 'Not now',
     'save_blocked' => ':name is editing this record, so your changes were not saved.',
+    'held_by_agent' => ':name, an AI agent, is editing this record. Saving is off until it finishes, then its changes load here.',
+    'reloaded' => 'You can edit now. We loaded the latest changes.',
 ];
