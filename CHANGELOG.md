@@ -11,6 +11,10 @@
 - Fixed: with two or more people on a page, the "Who's here" avatars stacked
   vertically instead of in a row.
 
+## 0.2.3
+
+- README: cover image and screenshots.
+
 ## 0.2.0
 
 - `presence()`: avatars in the page header show who else has the page open.

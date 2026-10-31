@@ -1,5 +1,7 @@
 # hibira-io/filament
 
+![hibira-io/filament](art/cover.jpg)
+
 [![ci](https://github.com/hibira-io/filament/actions/workflows/ci.yml/badge.svg)](https://github.com/hibira-io/filament/actions/workflows/ci.yml)
 
 Live notifications for [Filament](https://filamentphp.com) panels, on
