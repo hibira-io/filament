@@ -22,9 +22,15 @@
                 return true
             }
             if (! join()) window.addEventListener('EchoLoaded', join, { once: true })
+            // An agent's process can stop without telling anyone; its lock
+            // then times out, so check now and then while one holds it.
+            this.timer = setInterval(() => {
+                if (this.$wire.hibiraLockHolder?.agent) this.$wire.claimHibiraLock()
+            }, 30000)
         },
         destroy() {
             if (window.Echo) window.Echo.leave(this.channel)
+            clearInterval(this.timer)
         },
         holds() {
             return String(this.$wire.hibiraLockHolder?.id) === String(this.me)
@@ -33,7 +39,16 @@
     data-hibira-lock
     style="display: grid; gap: 0.75rem"
 >
-    @unless ($holds)
+    @if (! $holds && $agent)
+        <div
+            role="status"
+            data-hibira-lock-agent
+            style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #eef2ff; color: #312e81; border: 1px solid #a5b4fc"
+        >
+            <img src="{{ $holder['avatar'] ?? \Hibira\Filament\Agents\Agent::defaultAvatar() }}" alt="" style="width: 2rem; height: 2rem; border-radius: 9999px; object-fit: cover; flex-shrink: 0" />
+            <span>{{ __('hibira-filament::lock.held_by_agent', ['name' => $holder['name'] ?? '']) }}</span>
+        </div>
+    @elseif (! $holds)
         <div
             role="status"
             style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #fef3c7; color: #78350f; border: 1px solid #fcd34d"
@@ -43,7 +58,7 @@
                 {{ __('hibira-filament::lock.request') }}
             </x-filament::button>
         </div>
-    @endunless
+    @endif
 
     <template x-for="request in requests" x-bind:key="request.id">
         <div

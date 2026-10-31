@@ -6,6 +6,9 @@ use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Channels for "who's here" avatars, record locks, live tables and job
@@ -72,6 +75,24 @@ class Presence
         ];
     }
 
+    /**
+     * Laravel channel name (without the presence- prefix) of a page's room.
+     * The same name presence-avatars.blade.php builds in the browser.
+     */
+    public static function pageChannel(string $panelId, string $path): string
+    {
+        $hash = 5381;
+
+        // JavaScript adds each code point's first UTF-16 unit.
+        foreach (mb_str_split($path) as $char) {
+            $code = mb_ord($char);
+            $unit = $code > 0xFFFF ? 0xD800 + (($code - 0x10000) >> 10) : $code;
+            $hash = (($hash << 5) + $hash + $unit) & 0xFFFFFFFF;
+        }
+
+        return "hibira.{$panelId}.page.".base_convert((string) $hash, 10, 36);
+    }
+
     /** Laravel channel name (without the presence- prefix) of a record lock. */
     public static function lockChannel(string $panelId, string $subject): string
     {
@@ -100,5 +121,82 @@ class Presence
         $users = app('hibira')->get('/channels/presence-'.$channel.'/users', [], true)['users'] ?? [];
 
         return array_values(array_map(fn (array $user): string => (string) $user['id'], $users));
+    }
+
+    /** Cache key that holds a lock's holder. */
+    public static function lockCacheKey(string $lockChannel): string
+    {
+        return 'hibira-filament:'.$lockChannel;
+    }
+
+    /**
+     * Whether a member is still in a presence channel: an agent that has
+     * not timed out, or a user Hibira lists. If Hibira can't be reached,
+     * users count as present.
+     */
+    public static function isHere(string $channel, string $id): bool
+    {
+        if (str_starts_with($id, 'agent:')) {
+            return isset(static::agentsIn($channel)[$id]);
+        }
+
+        try {
+            return in_array($id, static::usersIn($channel), true);
+        } catch (Throwable $e) {
+            Log::warning('Hibira presence: '.$e->getMessage());
+
+            return true;
+        }
+    }
+
+    /**
+     * Agents in a channel. Agents can't hold a WebSocket open from a queued
+     * job, so they are kept in the cache and announced with events instead.
+     *
+     * @return array<string, array{id: string, name: string, avatar: string, agent: true, until: int}>
+     */
+    public static function agentsIn(string $channel): array
+    {
+        $now = now()->getTimestamp() * 1000;
+
+        return array_filter(
+            Cache::get(static::agentsKey($channel), []),
+            fn (array $agent): bool => $agent['until'] > $now,
+        );
+    }
+
+    /** @param  array{id: string, name: string, avatar: string, agent: true, until: int}  $agent */
+    public static function joinAgent(string $channel, array $agent): void
+    {
+        static::updateAgents($channel, fn (array $agents): array => [...$agents, $agent['id'] => $agent]);
+    }
+
+    public static function leaveAgent(string $channel, string $id): void
+    {
+        static::updateAgents($channel, fn (array $agents): array => array_diff_key($agents, [$id => true]));
+    }
+
+    /** @param  \Closure(array<string, array>): array<string, array>  $change */
+    protected static function updateAgents(string $channel, \Closure $change): void
+    {
+        $key = static::agentsKey($channel);
+
+        Cache::lock($key.':update', 5)->block(5, function () use ($key, $channel, $change) {
+            $agents = $change(static::agentsIn($channel));
+
+            if ($agents === []) {
+                Cache::forget($key);
+
+                return;
+            }
+
+            $ttl = (int) ceil(max(array_column($agents, 'until')) / 1000) - now()->getTimestamp();
+            Cache::put($key, $agents, max($ttl, 1));
+        });
+    }
+
+    protected static function agentsKey(string $channel): string
+    {
+        return 'hibira-filament:agents:'.$channel;
     }
 }

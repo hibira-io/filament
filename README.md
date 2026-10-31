@@ -21,6 +21,9 @@ settings the rest of your app uses, and adds:
 - **Edit locks.** One person edits a record at a time. Others see who holds
   it, can ask for it, and get it as soon as the holder hands it over or
   leaves, with no heartbeat polling and no lock table.
+- **AI agents in the room.** When an AI agent edits a record, it shows up in
+  the avatars with a robot face and takes the record's edit lock, just like
+  a person, so nobody saves over its work and it never saves over theirs.
 - **Live tables.** Resource tables refresh for everyone who has them open
   when records are saved or deleted, instead of polling.
 - **Import and export progress.** A progress bar shows how many rows of an
@@ -221,6 +224,103 @@ is.
 The holder is kept in your cache store, so use one that supports atomic
 locks (`redis`, `database`, `memcached`, `dynamodb`, `file` or `array`).
 Presence for locks works with or without `->presence()`.
+
+## AI agents
+
+![AI agents in your Filament team: robot avatars in "who's here", and the same edit lock as people](art/agents-cover.jpg)
+
+Agents that change records, such as a [Laravel AI SDK](https://laravel.com/docs/ai)
+tool, a support bot or an approved action from
+[hibira-io/filament-approvals](https://github.com/hibira-io/filament-approvals),
+can join a record's page the same way a person does. Wrap the change in
+`Agent::edit()`:
+
+```php
+use Hibira\Filament\Agents\Agent;
+
+Agent::make('support-assistant')
+    ->name('Support assistant')
+    ->edit($order, function () use ($order) {
+        $order->update(['status' => 'refunded']);
+    });
+```
+
+While the callback runs:
+
+- **The agent shows up in "Who's here"** on the record's view and edit pages,
+  with a robot avatar and an "AI agent" label. Pass `->avatar($url)` for your
+  own image.
+- **It holds the edit lock.** People on the edit page see a banner saying the
+  agent is editing, and their Save button is off.
+- **It lets go when done**, even if the callback throws. The next person on
+  the page takes the lock and their form reloads with the agent's changes.
+
+| The agent is editing | It's done, its changes are loaded |
+| --- | --- |
+| ![Banner: Support assistant, an AI agent, is editing this record](art/agent-lock.png) | ![Toast: You can edit now. We loaded the latest changes](art/agent-done.png) |
+
+The agent follows the lock rules too. If a person is editing the record,
+`edit()` throws `RecordLockedException` without running the callback. Pass
+`wait:` to ask them for it instead: they get the usual **Save and hand over**
+prompt, and the agent waits up to that many seconds for the record.
+
+![Banner: Support assistant asks to edit this record, with Not now and Save and hand over](art/agent-asks.png)
+
+In a Laravel AI SDK tool, tell the model when the record is busy so it can
+say so or try later:
+
+```php
+use Hibira\Filament\Agents\Agent;
+use Hibira\Filament\Agents\RecordLockedException;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+
+class RefundOrder implements Tool
+{
+    public function handle(Request $request): string
+    {
+        $order = Order::findOrFail($request['order_id']);
+
+        try {
+            return Agent::for(SupportAssistant::class)->edit($order, function () use ($order) {
+                $order->refund();
+
+                return "Order {$order->id} refunded.";
+            }, wait: 20);
+        } catch (RecordLockedException $e) {
+            return "{$e->holder['name']} is editing this order right now. Try again later.";
+        }
+    }
+
+    // description() and schema() as usual.
+}
+```
+
+`Agent::for()` names the agent after a class: `SupportAssistant` becomes
+"Support Assistant".
+
+The agent appears in every panel that uses this plugin and has a resource for
+the record's model, and takes the lock of each edit page that uses
+`InteractsWithHibiraLock`. Limit it with `->panels('admin')`.
+
+Agents run in a queued job or a request, not a browser, so they can't keep a
+WebSocket open. They are kept in your cache store and announced to the page
+with events instead. If the agent's process dies, it times out after five
+minutes (`->ttl(seconds)`). For longer work, call `touch()` on the session the
+callback receives, or use `start()` and `stop()` yourself:
+
+```php
+$session = Agent::make('importer')->start($record);
+
+try {
+    foreach ($rows as $row) {
+        // ...
+        $session->touch();
+    }
+} finally {
+    $session->stop();
+}
+```
 
 ## Live tables
 

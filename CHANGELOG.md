@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- AI agents in "Who's here" and edit locks: `Agent::make('id')->edit($record, fn () => ...)`
+  shows the agent on the record's pages with a robot avatar and holds the
+  record's edit lock while it works. People can't save over it, it waits for
+  or asks people who hold the lock (`wait:`), and lets go when done.
+- When the lock passes to you from someone else, the edit form reloads with
+  their saved changes, so you never save over them.
+- Fixed: with two or more people on a page, the "Who's here" avatars stacked
+  vertically instead of in a row.
+
 ## 0.2.0
 
 - `presence()`: avatars in the page header show who else has the page open.
