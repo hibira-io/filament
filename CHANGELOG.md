@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Works with hibira-io/laravel 0.2 and 0.3. On 0.3 the push SDK is
+  optional, so `composer require hibira-io/filament` no longer needs `-W`
+  on a fresh Laravel 13 app.
+
 ## 0.3.0
 
 - AI agents in "Who's here" and edit locks: `Agent::make('id')->edit($record, fn () => ...)`
