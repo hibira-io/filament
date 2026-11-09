@@ -41,13 +41,38 @@ broadcasting, push notifications and webhooks.
 
 ```sh
 composer require hibira-io/filament
-php artisan hibira:install
+php artisan hibira:filament
 ```
 
-`hibira:install` (from hibira-io/laravel) adds the `HIBIRA_*` settings to
-`.env` and sets `BROADCAST_CONNECTION=hibira`. Copy the app ID, key and
-secret from your app page on [hibira.io/portal](https://hibira.io/portal)
-(the free plan needs no card):
+`hibira:filament` sets everything up in one go and then checks it:
+
+- adds the `HIBIRA_*` settings to `.env`, sets `BROADCAST_CONNECTION=hibira`
+  and asks for your app ID, key and secret (copy them from your app page on
+  [hibira.io/portal](https://hibira.io/portal); the free plan needs no card)
+- turns on the broadcasting auth route and creates `routes/channels.php`,
+  if your app doesn't have them yet
+- creates the notifications table migration and offers to run it
+- adds the plugin to each panel provider in `app/Providers/Filament`, with
+  live notifications, who's here, live tables and live records on
+- checks the connection, the broadcasting route, each panel's guard and
+  user model, and reminds you to add your site to **Allowed origins**
+
+Run it again at any time: it only changes what is missing. To check without
+changing anything, run `php artisan hibira:filament --check`.
+
+That's it. Filament's own JavaScript already includes Laravel Echo, so there
+is nothing to build. You don't need `npm run build` for the panel, and you
+don't need to publish `config/filament.php`.
+
+### Setting it up by hand
+
+```sh
+composer require hibira-io/filament
+php artisan hibira:install --no-echo
+php artisan install:broadcasting --without-reverb --without-node
+php artisan make:notifications-table
+php artisan migrate
+```
 
 ```ini
 BROADCAST_CONNECTION=hibira
@@ -56,8 +81,6 @@ HIBIRA_APP_KEY=your-app-key
 HIBIRA_APP_SECRET=your-app-secret
 HIBIRA_HOST=ws.hibira.io
 ```
-
-Check them with `php artisan hibira:check`.
 
 Then add the plugin to your panel:
 
@@ -71,14 +94,12 @@ public function panel(Panel $panel): Panel
         ->plugin(
             HibiraPlugin::make()
                 ->databaseNotifications()
-                ->channelsWidget()
+                ->presence()
+                ->liveTables()
+                ->liveRecords()
         );
 }
 ```
-
-That's it. Filament's own JavaScript already includes Laravel Echo, so there
-is nothing to build. You don't need `npm run build` for the panel, and you
-don't need to publish `config/filament.php`.
 
 Until `HIBIRA_APP_KEY` is set the plugin stays out of the way: the panel
 loads without Echo and database notifications keep polling.
@@ -86,8 +107,8 @@ loads without Echo and database notifications keep polling.
 ## Live database notifications
 
 `->databaseNotifications()` turns on the panel's notification bell and
-turns off its polling. To send a notification that shows up straight away,
-pass `isEventDispatched: true` so Filament tells the browser over Hibira:
+turns off its polling. Every database notification then shows up straight
+away, however it is sent, with no change to your code:
 
 ```php
 use Filament\Notifications\Notification;
@@ -95,10 +116,20 @@ use Filament\Notifications\Notification;
 Notification::make()
     ->title('Order #1024 shipped')
     ->success()
-    ->sendToDatabase($user, isEventDispatched: true);
+    ->sendToDatabase($user);
+
+// Laravel notifications stored with the database channel too.
+$user->notify(new OrderShipped($order));
 ```
 
-Or send a toast that is not stored, to a user who is online now:
+Filament on its own only updates the bell for notifications sent with
+`isEventDispatched: true`, and sends that update through your queue, so
+without a running `queue:work` nothing arrives. The plugin tells the bell
+itself, straight to Hibira, once per user when the request or queued job
+ends. To go back to Filament's behaviour, pass
+`->databaseNotifications(live: false)`.
+
+To send a toast that is not stored, to a user who is online now:
 
 ```php
 Notification::make()
@@ -106,16 +137,11 @@ Notification::make()
     ->broadcast($user);
 ```
 
-Both go out on the user's private channel, so your app needs the broadcasting
-auth route and the channel authorization Laravel adds with
-`php artisan install:broadcasting --without-reverb --without-node`
-(Laravel 11 and later). `routes/channels.php` then contains:
-
-```php
-Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
-});
-```
+Both go out on the user's private channel (`App.Models.User.{id}` for the
+default user model). The plugin lets each user listen on their own channel,
+so you don't need a rule in `routes/channels.php`; a rule you write there
+wins. The broadcasting auth route has to be on, which `hibira:filament`
+does for you.
 
 If you'd rather keep polling as a fallback, give it an interval:
 
@@ -326,9 +352,11 @@ try {
 
 ## Live tables
 
-`->liveTables()` refreshes a resource's list page for everyone who has it
-open, whenever one of its records is created, updated, deleted or restored:
-in the panel, in a queued job, an API controller or a console command.
+`->liveTables()` refreshes tables for everyone who has them open, whenever
+one of their records is created, updated, deleted or restored: in the
+panel, in a queued job, an API controller or a console command. That covers
+resource list pages, relation managers (a post's comments, an order's
+items) and table widgets.
 
 ```php
 HibiraPlugin::make()->liveTables()
@@ -339,8 +367,9 @@ an import of a thousand rows refreshes each open table once per chunk, not a
 thousand times. Browsers wait 300 ms after the last message before
 refreshing.
 
-The plugin watches the models of the panel's resources. For pages whose
-table lists another model, pass it:
+The plugin watches the models of the panel's resources and of their
+relation managers. For other tables, such as a table widget that lists
+another model, pass it:
 
 ```php
 HibiraPlugin::make()->liveTables(models: [AuditEntry::class])
@@ -354,6 +383,25 @@ Post::query()->where('draft', true)->update(['draft' => false]);
 
 app(\Hibira\Filament\LiveTables::class)->touch(Post::class);
 ```
+
+## Live records
+
+`->liveRecords()` keeps view and edit pages up to date when their record is
+changed somewhere else: by a teammate, a queued job, an API call or an AI
+agent.
+
+```php
+HibiraPlugin::make()->liveRecords()
+```
+
+- **View pages** show the new values at once.
+- **Edit pages** say who changed the record, with a **Load changes** button.
+  It loads only the fields they changed, so your other unsaved edits stay.
+  If the record is deleted, the page says so.
+
+Messages name the changed fields and who changed them, never their values.
+Edit pages that use [edit locks](#edit-locks) are kept up to date by the
+lock instead. Like live tables, only Eloquent model events are seen.
 
 ## Import and export progress
 
@@ -425,7 +473,7 @@ served, so other panels keep their own `filament.broadcasting.echo` config.
 
 ## Translations
 
-The connection light and widget come in English, Traditional Chinese,
+Everything the plugin shows comes in English, Traditional Chinese,
 Simplified Chinese, Japanese, Korean, Thai and Vietnamese, following the app
 locale. To change the wording:
 
@@ -439,6 +487,14 @@ php artisan vendor:publish --tag=hibira-filament-translations
 composer install
 composer test
 ```
+
+## 中文摘要
+
+Filament 3/4/5 插件，把面板的 Laravel Echo 接到 Hibira。`composer require hibira-io/filament`
+後執行 `php artisan hibira:filament`，一條命令就會寫好 `.env` 設定、開啟廣播授權路由、建立通知資料表，
+並把插件加進 Panel，最後檢查連線與設定。功能：所有資料庫通知即時更新鈴鐺（不必加
+`isEventDispatched`，也不需要佇列）、連線指示燈、誰在線、編輯鎖、AI 代理、即時表格（含關聯表與表格小工具）、
+即時記錄（查看頁自動更新，編輯頁提示誰改了並可載入對方的修改）、匯入匯出進度與團隊聊天。
 
 ## License
 

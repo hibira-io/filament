@@ -69,6 +69,13 @@ abstract class TestCase extends Orchestra
             $table->timestamps();
         });
 
+        Schema::create('comments', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('post_id');
+            $table->string('body');
+            $table->timestamps();
+        });
+
         Schema::create('imports', function (Blueprint $table) {
             $table->id();
             $table->timestamp('completed_at')->nullable();

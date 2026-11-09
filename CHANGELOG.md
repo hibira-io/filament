@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+- `php artisan hibira:filament`: one command to set up an app. It adds the
+  settings to `.env` and asks for the credentials, turns on the broadcasting
+  auth route, creates the notifications table, adds the plugin to your panel
+  providers, then checks the connection, guards and user model. `--check`
+  only checks.
+- Every database notification now updates the bell at once, without
+  `isEventDispatched: true` and without a queue worker. The user's
+  notification channel is authorized for you. Opt out with
+  `->databaseNotifications(live: false)`.
+- `liveTables()` also refreshes relation managers and table widgets, and
+  watches the models of the panel's relation managers.
+- `liveRecords()`: view pages show changes made elsewhere at once; edit
+  pages say who changed the record and load their changes when you are
+  ready, keeping your other unsaved edits.
+
 ## 0.3.1
 
 - Works with hibira-io/laravel 0.2 and 0.3. On 0.3 the push SDK is

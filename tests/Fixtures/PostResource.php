@@ -18,10 +18,16 @@ class PostResource extends Resource
         ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [CommentsRelationManager::class];
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListPosts::route('/'),
+            'view' => ViewPost::route('/{record}'),
             'edit' => EditPost::route('/{record}/edit'),
         ];
     }

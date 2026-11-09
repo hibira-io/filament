@@ -5,8 +5,13 @@ namespace Hibira\Filament\Tests;
 use Filament\Facades\Filament;
 use Hibira\Filament\LiveTables;
 use Hibira\Filament\Presence;
+use Hibira\Filament\Tests\Fixtures\Comment;
+use Hibira\Filament\Tests\Fixtures\CommentsRelationManager;
+use Hibira\Filament\Tests\Fixtures\EditPost;
 use Hibira\Filament\Tests\Fixtures\Post;
+use Hibira\Filament\Tests\Fixtures\PostResource;
 use Hibira\Filament\Tests\Fixtures\User;
+use Livewire\Livewire;
 use Mockery;
 use Pusher\Pusher;
 
@@ -28,9 +33,37 @@ class LiveTablesTest extends TestCase
         $this->app->instance('hibira', $hibira);
     }
 
+    public function test_relation_manager_models_are_found()
+    {
+        $this->assertSame([Comment::class], LiveTables::relatedModels([PostResource::class]));
+    }
+
+    public function test_relation_managers_listen_for_changes()
+    {
+        $post = Post::create(['title' => 'Hello']);
+        $this->actingAs(User::create(['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'x']));
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::bootCurrentPanel();
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $post, 'pageClass' => EditPost::class])
+            ->assertSee('data-hibira-live-table', false)
+            ->assertSee(Presence::tableChannel('admin', Comment::class), false);
+
+        app(LiveTables::class)->flush();
+        $this->triggered = [];
+
+        $post->comments()->create(['body' => 'Nice']);
+        app(LiveTables::class)->flush();
+
+        $this->assertSame([
+            [['private-'.Presence::tableChannel('admin', Comment::class)], 'hibira-table-changed'],
+        ], $this->triggered);
+    }
+
     public function test_resource_models_are_watched()
     {
-        $this->assertSame([Post::class], app(LiveTables::class)->models());
+        $this->assertSame([Post::class, Comment::class], app(LiveTables::class)->models());
     }
 
     public function test_a_burst_of_changes_is_one_message()
