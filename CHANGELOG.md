@@ -7,9 +7,11 @@
   auth route, creates the notifications table, adds the plugin to your panel
   providers, then checks the connection, guards and user model. `--check`
   only checks.
-- Every database notification now updates the bell at once, without
-  `isEventDispatched: true` and without a queue worker. The user's
-  notification channel is authorized for you. Opt out with
+- Every database notification now updates the bell as soon as it is
+  stored, without `isEventDispatched: true` and without a second queued
+  broadcast. The user's notification channel is authorized for you, and
+  on Filament 4 and 5 the first notification no longer waits for a page
+  load. Opt out with
   `->databaseNotifications(live: false)`.
 - `liveTables()` also refreshes relation managers and table widgets, and
   watches the models of the panel's relation managers.

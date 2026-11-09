@@ -16,6 +16,8 @@ class HibiraFilamentServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        LiveRecords::handleRefreshCalls();
+
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'hibira-filament');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'hibira-filament');
 

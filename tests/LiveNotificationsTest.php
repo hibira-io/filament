@@ -64,6 +64,18 @@ class LiveNotificationsTest extends TestCase
         ], 'database-notifications.sent']], $this->triggered);
     }
 
+    public function test_panel_pages_refresh_the_bell_themselves()
+    {
+        // Filament 4 and 5 only listen once the user has a notification.
+        $ada = User::create(['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'x']);
+
+        $this->actingAs($ada)
+            ->get('/admin')
+            ->assertOk()
+            ->assertSee('data-hibira-live-notifications', false)
+            ->assertSee('Hibira.Filament.Tests.Fixtures.User.'.$ada->id, false);
+    }
+
     public function test_the_channel_follows_receives_broadcast_notifications_on()
     {
         $user = new class extends User

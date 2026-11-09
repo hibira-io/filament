@@ -34,7 +34,7 @@
             const names = Object.keys(this.attributes)
             this.attributes = {}
             this.change = null
-            this.$wire.refreshFormData(names)
+            this.$wire.call(@js(\Hibira\Filament\LiveRecords::REFRESH), names)
         },
         message() {
             if (! this.change) return ''

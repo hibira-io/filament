@@ -90,8 +90,8 @@ class HibiraPlugin implements Plugin
      * as soon as they are sent, so polling is off unless you pass an
      * interval as a fallback.
      *
-     * With $live on, every database notification updates the bell straight
-     * away, without isEventDispatched: true and without a queue worker.
+     * With $live on, every database notification updates the bell as soon
+     * as it is stored, without isEventDispatched: true.
      * Turn it off to update the bell only for notifications sent with
      * isEventDispatched: true, as Filament does on its own.
      */
@@ -432,6 +432,20 @@ class HibiraPlugin implements Plugin
                         'deleted' => __('hibira-filament::record.deleted'),
                         'deleted_by' => __('hibira-filament::record.deleted_by', ['name' => '__NAME__']),
                     ],
+                ])->render();
+            });
+        }
+
+        if ($this->hasDatabaseNotifications && $this->hasLiveNotifications) {
+            FilamentView::registerRenderHook(PanelsRenderHook::BODY_END, function (): string {
+                $user = Filament::auth()->user();
+
+                if (! $user instanceof Model) {
+                    return '';
+                }
+
+                return view('hibira-filament::live-notifications', [
+                    'channel' => LiveNotifications::channel($user),
                 ])->render();
             });
         }

@@ -123,11 +123,16 @@ $user->notify(new OrderShipped($order));
 ```
 
 Filament on its own only updates the bell for notifications sent with
-`isEventDispatched: true`, and sends that update through your queue, so
-without a running `queue:work` nothing arrives. The plugin tells the bell
-itself, straight to Hibira, once per user when the request or queued job
-ends. To go back to Filament's behaviour, pass
-`->databaseNotifications(live: false)`.
+`isEventDispatched: true`, and does it with a second queued job. The plugin
+tells the bell itself, straight to Hibira, once per user when the request or
+queued job that stored the notification ends. It also refreshes the bell itself, because Filament 4 and 5 only
+start listening once a user already has a notification, so the first one
+would otherwise wait for a page load. To go back to Filament's behaviour,
+pass `->databaseNotifications(live: false)`.
+
+Filament stores its database notifications from the queue, so keep
+`php artisan queue:work` running (or use `QUEUE_CONNECTION=sync` while
+developing). `hibira:filament` reminds you.
 
 To send a toast that is not stored, to a user who is online now:
 
@@ -492,8 +497,8 @@ composer test
 
 Filament 3/4/5 插件，把面板的 Laravel Echo 接到 Hibira。`composer require hibira-io/filament`
 後執行 `php artisan hibira:filament`，一條命令就會寫好 `.env` 設定、開啟廣播授權路由、建立通知資料表，
-並把插件加進 Panel，最後檢查連線與設定。功能：所有資料庫通知即時更新鈴鐺（不必加
-`isEventDispatched`，也不需要佇列）、連線指示燈、誰在線、編輯鎖、AI 代理、即時表格（含關聯表與表格小工具）、
+並把插件加進 Panel，最後檢查連線與設定。功能：所有資料庫通知一存入就即時更新鈴鐺（不必加
+`isEventDispatched`）、連線指示燈、誰在線、編輯鎖、AI 代理、即時表格（含關聯表與表格小工具）、
 即時記錄（查看頁自動更新，編輯頁提示誰改了並可載入對方的修改）、匯入匯出進度與團隊聊天。
 
 ## License

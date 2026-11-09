@@ -2,10 +2,13 @@
 
 namespace Hibira\Filament\Tests;
 
+use Filament\Facades\Filament;
 use Hibira\Filament\LiveRecords;
 use Hibira\Filament\Presence;
 use Hibira\Filament\Tests\Fixtures\Post;
 use Hibira\Filament\Tests\Fixtures\User;
+use Hibira\Filament\Tests\Fixtures\ViewPost;
+use Livewire\Livewire;
 use Mockery;
 use Pusher\Pusher;
 
@@ -62,6 +65,24 @@ class LiveRecordsTest extends TestCase
 
         $this->assertTrue($this->triggered[0][2]['deleted']);
         $this->assertNull($this->triggered[0][2]['by']);
+    }
+
+    public function test_the_browser_can_load_the_changed_fields()
+    {
+        $ada = User::create(['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'x']);
+        $post = Post::create(['title' => 'Hello']);
+        $this->actingAs($ada);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Filament::bootCurrentPanel();
+
+        $page = Livewire::test(ViewPost::class, ['record' => $post->getKey()]);
+
+        Post::whereKey($post->getKey())->update(['title' => 'Hello again']);
+
+        $page->call(LiveRecords::REFRESH, ['title'])
+            ->assertOk()
+            ->assertSet('data.title', 'Hello again');
     }
 
     public function test_view_pages_listen_and_locked_edit_pages_do_not()

@@ -69,7 +69,8 @@ PHP);
     public function test_one_command_sets_up_the_app()
     {
         $this->artisan('hibira:filament', ['--offline' => true, '--no-interaction' => true])
-            ->expectsOutputToContain('Added the Hibira plugin to the admin panel');
+            ->expectsOutputToContain('Added the Hibira plugin to the admin panel')
+            ->doesntExpectOutputToContain('no Hibira plugin');
 
         $env = file_get_contents($this->dir.'/.env');
         $this->assertStringContainsString('HIBIRA_APP_KEY=', $env);

@@ -36,6 +36,9 @@ class FilamentCommand extends Command
 
     protected int $warnings = 0;
 
+    /** @var list<string> panels whose provider this run added the plugin to */
+    protected array $added = [];
+
     public function handle(Filesystem $files): int
     {
         if (! $this->option('check')) {
@@ -222,6 +225,7 @@ PHP);
             $source = str_replace($line, $line."\n".$plugin, $source);
             $source = $this->addImport($source, HibiraPlugin::class);
             $files->put($path, $source);
+            $this->added[] = $id;
 
             $this->passCheck("Added the Hibira plugin to the {$id} panel (".str_replace(base_path().DIRECTORY_SEPARATOR, '', $path).')');
         }
@@ -293,6 +297,17 @@ PHP);
         foreach ($panels as $panel) {
             $id = $panel->getId();
 
+            // Added in this run: the panel was registered before the change.
+            if (in_array($id, $this->added, true)) {
+                $this->passCheck("Panel $id: Hibira plugin added");
+
+                if (! $this->notificationsTableExists($files)) {
+                    $this->failCheck("Panel $id: no notifications table", 'Run php artisan make:notifications-table, then php artisan migrate.');
+                }
+
+                continue;
+            }
+
             if (! $panel->hasPlugin('hibira')) {
                 $this->warnCheck("Panel $id: no Hibira plugin", 'Run this command without --check, or add HibiraPlugin::make() to the panel.');
 
@@ -309,6 +324,8 @@ PHP);
                 } else {
                     $this->failCheck("Panel $id: no notifications table", 'Run php artisan make:notifications-table, then php artisan migrate.');
                 }
+
+                $this->checkQueue();
             }
 
             $guard = $panel->getAuthGuard();
@@ -326,6 +343,17 @@ PHP);
                     'Outside local, Filament and Hibira channels let in only users whose canAccessPanel() returns true.',
                 );
             }
+        }
+    }
+
+    protected function checkQueue(): void
+    {
+        $queue = config('queue.default');
+
+        if ($queue === 'sync') {
+            $this->passCheck('Queue: sync');
+        } else {
+            $this->passCheck("Queue: $queue. Keep php artisan queue:work running: Filament stores database notifications from the queue");
         }
     }
 

@@ -3,6 +3,8 @@
 namespace Hibira\Filament;
 
 use Filament\Facades\Filament;
+use Filament\Resources\Pages\EditRecord;
+use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -20,6 +22,9 @@ use Throwable;
 class LiveRecords
 {
     public const EVENT = 'hibira-record-changed';
+
+    /** The Livewire call the browser makes to load the changed fields. */
+    public const REFRESH = '__hibiraRefreshRecord';
 
     /** @var array<class-string, array<string, true>> model => panel IDs */
     protected array $models = [];
@@ -46,6 +51,41 @@ class LiveRecords
             app()->terminating(fn () => $this->flush());
             Event::listen([JobProcessed::class, JobFailed::class], fn () => $this->flush());
         }
+    }
+
+    /**
+     * Answers the browser's request to load changed fields on a view or
+     * edit page. Filament 4 and later don't let the browser call
+     * refreshFormData() itself, so the call is handled here instead.
+     */
+    public static function handleRefreshCalls(): void
+    {
+        if (! function_exists('Livewire\\on')) {
+            return;
+        }
+
+        \Livewire\on('call', function ($component, $method, $params, $context, $returnEarly) {
+            if ($method !== static::REFRESH) {
+                return;
+            }
+
+            if (! ($component instanceof EditRecord || $component instanceof ViewRecord)) {
+                return;
+            }
+
+            $attributes = array_values(array_filter((array) ($params[0] ?? []), 'is_string'));
+
+            try {
+                if ($attributes !== []) {
+                    $component->refreshFormData($attributes);
+                }
+            } catch (Throwable $e) {
+                // Pages without a form (an infolist only) re-render anyway.
+                Log::debug('Hibira live records: '.$e->getMessage());
+            }
+
+            $returnEarly();
+        });
     }
 
     /** @return list<class-string> */

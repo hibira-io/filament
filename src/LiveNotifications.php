@@ -16,9 +16,9 @@ use Throwable;
  * Updates the notification bell as soon as any database notification is
  * stored, not only the ones sent with isEventDispatched: true.
  *
- * Filament's own DatabaseNotificationsSent event is queued, so without a
- * queue worker the bell never hears about it. This sends the same event
- * straight to Hibira when the request or queued job ends, once per user.
+ * Filament's own DatabaseNotificationsSent event goes out only when asked
+ * for, as a second queued job. This sends the same event straight to
+ * Hibira when the request or queued job that stored it ends, once per user.
  */
 class LiveNotifications
 {
