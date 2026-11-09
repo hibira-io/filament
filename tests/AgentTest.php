@@ -88,7 +88,10 @@ class AgentTest extends TestCase
             $session->locks,
         );
         $this->assertSame(
-            [Presence::pageChannel('admin', '/admin/posts/'.$this->post->getKey().'/edit')],
+            [
+                Presence::pageChannel('admin', '/admin/posts/'.$this->post->getKey()),
+                Presence::pageChannel('admin', '/admin/posts/'.$this->post->getKey().'/edit'),
+            ],
             $session->rooms,
         );
         $this->assertTrue($session->holdsLock());

@@ -6,7 +6,10 @@ use Filament\Contracts\Plugin;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Support\Facades\FilamentView;
+use Filament\Resources\Pages\EditRecord;
+use Filament\Resources\Pages\ViewRecord;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Hibira\Filament\Chat\Chat;
 use Hibira\Filament\Concerns\InteractsWithHibiraLock;
@@ -14,8 +17,10 @@ use Hibira\Filament\Http\ChatController;
 use Hibira\Filament\Pages\Chat as ChatPage;
 use Hibira\Filament\Widgets\HibiraChannelsWidget;
 use Hibira\Laravel\Hibira;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
+use Throwable;
 
 /**
  * Points a Filament panel's Laravel Echo client at Hibira.
@@ -43,6 +48,10 @@ class HibiraPlugin implements Plugin
 
     /** @var list<class-string> */
     protected array $liveTableModels = [];
+
+    protected bool $hasLiveRecords = false;
+
+    protected bool $hasLiveNotifications = true;
 
     protected bool $hasImportProgress = false;
 
@@ -80,11 +89,17 @@ class HibiraPlugin implements Plugin
      * Turns on the panel's database notifications. They arrive over Hibira
      * as soon as they are sent, so polling is off unless you pass an
      * interval as a fallback.
+     *
+     * With $live on, every database notification updates the bell as soon
+     * as it is stored, without isEventDispatched: true.
+     * Turn it off to update the bell only for notifications sent with
+     * isEventDispatched: true, as Filament does on its own.
      */
-    public function databaseNotifications(bool $condition = true, ?string $polling = null): static
+    public function databaseNotifications(bool $condition = true, ?string $polling = null, bool $live = true): static
     {
         $this->hasDatabaseNotifications = $condition;
         $this->databaseNotificationsPolling = $polling;
+        $this->hasLiveNotifications = $live;
 
         return $this;
     }
@@ -134,6 +149,39 @@ class HibiraPlugin implements Plugin
         $this->liveTableModels = $models;
 
         return $this;
+    }
+
+    /**
+     * Keeps view and edit pages up to date when their record changes
+     * somewhere else. View pages show the new values at once; edit pages
+     * say who changed it and load the changes when the user is ready,
+     * keeping their other unsaved edits.
+     */
+    public function liveRecords(bool $condition = true): static
+    {
+        $this->hasLiveRecords = $condition;
+
+        return $this;
+    }
+
+    public function hasDatabaseNotifications(): bool
+    {
+        return $this->hasDatabaseNotifications;
+    }
+
+    public function hasLiveTables(): bool
+    {
+        return $this->hasLiveTables;
+    }
+
+    public function hasLiveRecords(): bool
+    {
+        return $this->hasLiveRecords;
+    }
+
+    public function hasPresence(): bool
+    {
+        return $this->hasPresence;
     }
 
     /** Shows the progress of the user's imports and exports as their rows are processed. */
@@ -239,13 +287,25 @@ class HibiraPlugin implements Plugin
         app()->booted(function () use ($panel) {
             Presence::registerChannels($panel->getId(), $panel->getAuthGuard());
 
+            $resourceModels = array_map(fn (string $resource): string => $resource::getModel(), $panel->getResources());
+
             // Records change in queued jobs and other panels too, so the
             // models are watched on every request, not only this panel's.
             if ($this->hasLiveTables) {
                 app(LiveTables::class)->watch($panel->getId(), array_unique([
-                    ...array_map(fn (string $resource): string => $resource::getModel(), $panel->getResources()),
+                    ...$resourceModels,
+                    ...LiveTables::relatedModels($panel->getResources()),
                     ...$this->liveTableModels,
                 ]));
+            }
+
+            if ($this->hasLiveRecords) {
+                app(LiveRecords::class)->watch($panel->getId(), array_unique($resourceModels));
+            }
+
+            if ($this->hasDatabaseNotifications && $this->hasLiveNotifications && $this->isConfigured()) {
+                app(LiveNotifications::class)->watch();
+                LiveNotifications::authorizeChannel(static::userModel($panel), $panel->getAuthGuard());
             }
 
             if ($this->hasImportProgress) {
@@ -323,14 +383,16 @@ class HibiraPlugin implements Plugin
         }
 
         if ($this->hasLiveTables) {
-            FilamentView::registerRenderHook(PanelsRenderHook::PAGE_START, function () use ($panel): string {
-                $page = Livewire::current();
+            // Every table renders this hook: list pages, relation managers
+            // and table widgets.
+            FilamentView::registerRenderHook(TablesRenderHook::HEADER_BEFORE, function () use ($panel): string {
+                $component = Livewire::current();
 
-                if (! $page instanceof HasTable) {
+                if (! $component instanceof HasTable) {
                     return '';
                 }
 
-                $model = $page->getTable()->getModel();
+                $model = $component->getTable()->getModel();
 
                 if (! in_array($model, app(LiveTables::class)->models(), true)) {
                     return '';
@@ -338,6 +400,52 @@ class HibiraPlugin implements Plugin
 
                 return view('hibira-filament::live-table', [
                     'channel' => Presence::tableChannel($panel->getId(), $model),
+                ])->render();
+            });
+        }
+
+        if ($this->hasLiveRecords) {
+            FilamentView::registerRenderHook(PanelsRenderHook::PAGE_START, function () use ($panel): string {
+                $page = Livewire::current();
+
+                // Edit locks already keep their page up to date.
+                if (
+                    ! ($page instanceof EditRecord || $page instanceof ViewRecord)
+                    || in_array(InteractsWithHibiraLock::class, class_uses_recursive($page), true)
+                ) {
+                    return '';
+                }
+
+                $record = $page->getRecord();
+
+                if (! $record instanceof Model || ! app(LiveRecords::class)->watches($record)) {
+                    return '';
+                }
+
+                return view('hibira-filament::live-record', [
+                    'channel' => Presence::recordChannel($panel->getId(), $record),
+                    'me' => (string) Filament::auth()->id(),
+                    'editing' => $page instanceof EditRecord,
+                    'messages' => [
+                        'changed' => __('hibira-filament::record.changed'),
+                        'changed_by' => __('hibira-filament::record.changed_by', ['name' => '__NAME__']),
+                        'deleted' => __('hibira-filament::record.deleted'),
+                        'deleted_by' => __('hibira-filament::record.deleted_by', ['name' => '__NAME__']),
+                    ],
+                ])->render();
+            });
+        }
+
+        if ($this->hasDatabaseNotifications && $this->hasLiveNotifications) {
+            FilamentView::registerRenderHook(PanelsRenderHook::BODY_END, function (): string {
+                $user = Filament::auth()->user();
+
+                if (! $user instanceof Model) {
+                    return '';
+                }
+
+                return view('hibira-filament::live-notifications', [
+                    'channel' => LiveNotifications::channel($user),
                 ])->render();
             });
         }
@@ -384,6 +492,19 @@ class HibiraPlugin implements Plugin
                 'headers' => (object) [],
             ],
         ] : [], $this->echoOptions);
+    }
+
+    /** @return class-string|null the user model of the panel's guard */
+    public static function userModel(Panel $panel): ?string
+    {
+        try {
+            $provider = config('auth.guards.'.($panel->getAuthGuard() ?? config('auth.defaults.guard')).'.provider');
+            $model = config("auth.providers.{$provider}.model");
+
+            return is_string($model) ? $model : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     public function isConfigured(): bool

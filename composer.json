@@ -1,6 +1,6 @@
 {
     "name": "hibira-io/filament",
-    "description": "Live database notifications, an Echo connection light and a live channels widget for Filament panels, on Hibira",
+    "description": "Realtime Filament panels on Hibira: live notifications, who's here, edit locks, live tables and records, import progress and team chat",
     "keywords": [
         "filament",
         "filamentphp",
@@ -53,7 +53,7 @@
             ]
         },
         "branch-alias": {
-            "dev-main": "0.3.x-dev"
+            "dev-main": "0.4.x-dev"
         }
     },
     "scripts": {

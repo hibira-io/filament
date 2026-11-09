@@ -5,14 +5,15 @@ namespace Hibira\Filament;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Channels for "who's here" avatars, record locks, live tables and job
- * progress.
+ * Channels for "who's here" avatars, record locks, live tables, live
+ * records and job progress.
  *
  * Page rooms are named by the browser from the page path, so the server only
  * checks that the user may use the panel. Lock rooms are named by the server.
@@ -40,6 +41,7 @@ class Presence
         Broadcast::channel('hibira.{panel}.page.{room}', $authorize, $options);
         Broadcast::channel('hibira.{panel}.lock.{room}', $authorize, $options);
         Broadcast::channel('hibira.{panel}.table.{model}', $authorize, $options);
+        Broadcast::channel('hibira.{panel}.record.{record}', $authorize, $options);
         Broadcast::channel('hibira.{panel}.user.{id}', function ($user, string $panel, string $id) {
             return (string) $user->getAuthIdentifier() === $id && static::member($panel, $user) !== false;
         }, $options);
@@ -103,6 +105,12 @@ class Presence
     public static function tableChannel(string $panelId, string $model): string
     {
         return "hibira.{$panelId}.table.".substr(sha1($model), 0, 24);
+    }
+
+    /** Laravel channel name (without the private- prefix) told when a record changes. */
+    public static function recordChannel(string $panelId, Model $record): string
+    {
+        return "hibira.{$panelId}.record.".substr(sha1($record::class.'|'.$record->getKey()), 0, 24);
     }
 
     /** Laravel channel name (without the private- prefix) of one user's job progress. */
