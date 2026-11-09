@@ -32,6 +32,9 @@ settings the rest of your app uses, and adds:
   import or export are done, chunk by chunk.
 - **Team chat.** A Chat page for the panel's users, one to one or in
   groups, with unread counts, online status and message history.
+- **Waiting rooms.** A Waiting rooms page to run a ticket drop or a launch:
+  watch the line move live, pause, open, let more in, post a notice to
+  everyone in line, or close the room when you sell out.
 
 Supports Filament 3, 4 and 5. It builds on
 [hibira-io/laravel](https://github.com/hibira-io/laravel), which sets up
@@ -461,6 +464,46 @@ bar button still links to it), or move the button with
 Every message counts as one message per member toward your plan, like any
 other event.
 
+## Waiting rooms
+
+`->waitingRooms()` adds a **Waiting rooms** page for the
+[waiting rooms](https://github.com/hibira-io/laravel#waiting-rooms) that
+protect your routes with `Route::middleware('hibira.waiting:presale')`.
+It needs hibira-io/laravel 0.4 or later.
+
+```php
+HibiraPlugin::make()->waitingRooms()
+```
+
+![Waiting rooms page](art/waiting-rooms.png)
+
+Each room shows how many people are waiting, how far the line has got, the
+rate per minute and about how long the last person in line will wait. The
+numbers update live from the room's status channel, and the page refreshes
+every 15 seconds as well. From the page you can:
+
+- **Pause** (the line keeps its places) and **Open** again.
+- **Let in now:** move the line forward by a number of visitors, even while
+  paused.
+- **Notice:** a message shown at once to everyone on the waiting page, such
+  as "Restock at 3pm". Leave it empty to remove it.
+- **Close** when you sell out: nobody new can join, and people already let
+  in keep their pass until it expires.
+- Create a room, change its title, rate or opening time, open its waiting
+  page, or delete it.
+
+Every panel user may open the page unless you say who can:
+
+```php
+HibiraPlugin::make()->waitingRooms(
+    authorize: fn ($user) => $user->is_admin,
+    navigationGroup: 'Shop',
+)
+```
+
+Rooms are listed from Hibira. A Hibira server that cannot list rooms yet
+shows only the rooms you name: `->waitingRooms(rooms: ['presale'])`.
+
 ## Echo options
 
 The plugin builds these Echo options from `config/hibira.php`:
@@ -502,6 +545,8 @@ Filament 3/4/5 插件，把面板的 Laravel Echo 接到 Hibira。`composer requ
 並把插件加進 Panel，最後檢查連線與設定。功能：所有資料庫通知一存入就即時更新鈴鐺（不必加
 `isEventDispatched`）、連線指示燈、誰在線、編輯鎖、AI 代理、即時表格（含關聯表與表格小工具）、
 即時記錄（查看頁自動更新，編輯頁提示誰改了並可載入對方的修改）、匯入匯出進度與團隊聊天。
+`->waitingRooms()` 加上「等候室」頁面：即時看排隊人數與放行進度，可暫停、開放、立即放行、對排隊的人發布公告，
+售完時關閉等候室（需要 hibira-io/laravel 0.4 以上）。
 
 ## License
 

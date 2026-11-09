@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- `->waitingRooms()` adds a Waiting rooms page: live waiting and admitted
+  counts per room, and actions to pause, open, let in now, post a notice
+  on the waiting page, close, create, edit and delete rooms. Limit it with
+  `authorize:`. Needs hibira-io/laravel 0.4 or later (`composer require
+  hibira-io/laravel:^0.4`); with an older version the page says so.
+
 ## 0.4.0
 
 - `php artisan hibira:filament`: one command to set up an app. It adds the

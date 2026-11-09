@@ -15,6 +15,7 @@ use Hibira\Filament\Chat\Chat;
 use Hibira\Filament\Concerns\InteractsWithHibiraLock;
 use Hibira\Filament\Http\ChatController;
 use Hibira\Filament\Pages\Chat as ChatPage;
+use Hibira\Filament\Pages\WaitingRooms as WaitingRoomsPage;
 use Hibira\Filament\Widgets\HibiraChannelsWidget;
 use Hibira\Laravel\Hibira;
 use Illuminate\Database\Eloquent\Model;
@@ -65,6 +66,17 @@ class HibiraPlugin implements Plugin
     protected array $chatSearchColumns = ['name', 'email'];
 
     protected string $chatButtonHook = PanelsRenderHook::USER_MENU_BEFORE;
+
+    protected bool $hasWaitingRooms = false;
+
+    /** @var list<string> */
+    protected array $waitingRoomNames = [];
+
+    protected ?int $waitingRoomsNavigationSort = null;
+
+    protected ?string $waitingRoomsNavigationGroup = null;
+
+    protected ?\Closure $waitingRoomsAuthorization = null;
 
     /** @var array<string, mixed> */
     protected array $echoOptions = [];
@@ -248,8 +260,67 @@ class HibiraPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * Adds a Waiting rooms page where operators watch the line move and
+     * pause, open, admit, close and post a notice to their Hibira waiting
+     * rooms. Rooms are listed from Hibira; on servers that cannot list them
+     * yet, name them in $rooms.
+     *
+     * @param  list<string>  $rooms
+     * @param  (\Closure(\Illuminate\Contracts\Auth\Authenticatable): bool)|null  $authorize  who may open the page (default: every panel user)
+     */
+    public function waitingRooms(
+        bool $condition = true,
+        array $rooms = [],
+        ?int $navigationSort = null,
+        ?string $navigationGroup = null,
+        ?\Closure $authorize = null,
+    ): static {
+        $this->hasWaitingRooms = $condition;
+        $this->waitingRoomNames = array_values($rooms);
+        $this->waitingRoomsNavigationSort = $navigationSort;
+        $this->waitingRoomsNavigationGroup = $navigationGroup;
+        $this->waitingRoomsAuthorization = $authorize;
+
+        return $this;
+    }
+
+    public function hasWaitingRooms(): bool
+    {
+        return $this->hasWaitingRooms;
+    }
+
+    /** @return list<string> */
+    public function getWaitingRoomNames(): array
+    {
+        return $this->waitingRoomNames;
+    }
+
+    public function getWaitingRoomsNavigationSort(): ?int
+    {
+        return $this->waitingRoomsNavigationSort;
+    }
+
+    public function getWaitingRoomsNavigationGroup(): ?string
+    {
+        return $this->waitingRoomsNavigationGroup;
+    }
+
+    public function canManageWaitingRooms(?\Illuminate\Contracts\Auth\Authenticatable $user): bool
+    {
+        if (! $this->hasWaitingRooms || $user === null) {
+            return false;
+        }
+
+        return $this->waitingRoomsAuthorization === null || (bool) ($this->waitingRoomsAuthorization)($user);
+    }
+
     public function register(Panel $panel): void
     {
+        if ($this->hasWaitingRooms) {
+            $panel->pages([WaitingRoomsPage::class]);
+        }
+
         if ($this->hasDatabaseNotifications) {
             $panel->databaseNotifications();
 
