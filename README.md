@@ -404,6 +404,8 @@ HibiraPlugin::make()->liveRecords()
   It loads only the fields they changed, so your other unsaved edits stay.
   If the record is deleted, the page says so.
 
+![Ken saved the post while Mei was editing it: the page says so, and Load changes brings in only his fields](art/live-record.png)
+
 Messages name the changed fields and who changed them, never their values.
 Edit pages that use [edit locks](#edit-locks) are kept up to date by the
 lock instead. Like live tables, only Eloquent model events are seen.

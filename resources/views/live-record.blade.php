@@ -44,13 +44,17 @@
     }"
     data-hibira-live-record
 >
+    <style>
+        .hibira-live-record-banner { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd }
+        .dark .hibira-live-record-banner { background: rgb(30 58 138 / 0.35); color: #dbeafe; border-color: rgb(96 165 250 / 0.4) }
+    </style>
     <div
         x-cloak
         x-show="change"
         role="status"
-        style="margin-bottom: 0.75rem"
+        style="margin-top: 0.5rem; margin-bottom: 0.25rem"
     >
-        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd">
+        <div class="hibira-live-record-banner" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem">
             <span x-text="message()"></span>
             <span style="display: flex; gap: 0.5rem">
                 <x-filament::button size="sm" color="gray" x-on:click="change = null">
