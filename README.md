@@ -1,6 +1,6 @@
 # hibira-io/filament
 
-![hibira-io/filament](art/cover.jpg)
+<img src="art/cover.jpg" alt="hibira-io/filament" class="filament-hidden">
 
 [![ci](https://github.com/hibira-io/filament/actions/workflows/ci.yml/badge.svg)](https://github.com/hibira-io/filament/actions/workflows/ci.yml)
 
