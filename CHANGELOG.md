@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0
+
 - `->secretary()` adds Hibira Secretary, an assistant that works the panel
   for the signed-in user and asks before it saves, sends, deletes or pays.
   Set `HIBIRA_SECRETARY_KEY` and `HIBIRA_SECRETARY_SECRET`; the secret key
