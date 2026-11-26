@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `->secretary()` adds Hibira Secretary, an assistant that works the panel
+  for the signed-in user and asks before it saves, sends, deletes or pays.
+  Set `HIBIRA_SECRETARY_KEY` and `HIBIRA_SECRETARY_SECRET`; the secret key
+  stays on the server and signs each panel user in.
+
 ## 0.5.0
 
 - `->waitingRooms()` adds a Waiting rooms page: live waiting and admitted

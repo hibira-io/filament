@@ -50,6 +50,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('hibira.app_id', '1001');
         $app['config']->set('hibira.key', 'pk_test');
         $app['config']->set('hibira.secret', 'sk_test');
+        $app['config']->set('hibira-filament.secretary.key', 'pk_sec');
+        $app['config']->set('hibira-filament.secretary.secret', 'sk_sec');
     }
 
     protected function defineDatabaseMigrations()

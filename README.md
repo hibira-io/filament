@@ -504,6 +504,38 @@ HibiraPlugin::make()->waitingRooms(
 Rooms are listed from Hibira. A Hibira server that cannot list rooms yet
 shows only the rooms you name: `->waitingRooms(rooms: ['presale'])`.
 
+## Secretary
+
+`->secretary()` adds [Hibira Secretary](https://hibira.io) to the
+panel: an assistant that works the panel for the signed-in user. Ask it to
+"mark order 1002 as shipped with a note that it went by DHL", and it finds
+the order, fills in the form and asks before it saves. It works in the
+user's own browser with their own permissions, so it can only do what they
+could do by hand. It never types on sign-in or password pages, and it waits
+for the user to approve anything that saves, sends, deletes or pays.
+
+```php
+HibiraPlugin::make()->secretary()
+```
+
+Create a workspace on the Secretary page of
+[hibira.io/portal](https://hibira.io/portal), add your panel's address to its
+sites, and put its keys in `.env`:
+
+```dotenv
+HIBIRA_SECRETARY_KEY=pk_...
+HIBIRA_SECRETARY_SECRET=sk_...
+```
+
+![Secretary in a Filament panel](art/secretary.png)
+
+The secret key stays on your server: the plugin adds a
+`hibira/secretary/session` route to the panel that signs the panel user in
+and gives the browser a session token for that user only. The assistant
+follows the app locale, and keeps working across `->spa()` page changes.
+Without both keys the panel shows no assistant. Secretary does not need a
+Realtime app, so it works on a panel without `HIBIRA_APP_KEY`.
+
 ## Echo options
 
 The plugin builds these Echo options from `config/hibira.php`:
@@ -547,6 +579,9 @@ Filament 3/4/5 插件，把面板的 Laravel Echo 接到 Hibira。`composer requ
 即時記錄（查看頁自動更新，編輯頁提示誰改了並可載入對方的修改）、匯入匯出進度與團隊聊天。
 `->waitingRooms()` 加上「等候室」頁面：即時看排隊人數與放行進度，可暫停、開放、立即放行、對排隊的人發布公告，
 售完時關閉等候室（需要 hibira-io/laravel 0.4 以上）。
+`->secretary()` 加上 Hibira Secretary 助理：替登入的使用者操作面板，在使用者自己的瀏覽器裡、以使用者的權限執行，
+儲存、送出、刪除或付款前都會先徵求同意，也不會在登入或密碼頁面輸入。在 `.env` 設定 `HIBIRA_SECRETARY_KEY` 與
+`HIBIRA_SECRETARY_SECRET`，私密金鑰只留在伺服器。
 
 ## License
 

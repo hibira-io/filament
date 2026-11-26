@@ -14,6 +14,7 @@ use Filament\View\PanelsRenderHook;
 use Hibira\Filament\Chat\Chat;
 use Hibira\Filament\Concerns\InteractsWithHibiraLock;
 use Hibira\Filament\Http\ChatController;
+use Hibira\Filament\Http\SecretaryController;
 use Hibira\Filament\Pages\Chat as ChatPage;
 use Hibira\Filament\Pages\WaitingRooms as WaitingRoomsPage;
 use Hibira\Filament\Widgets\HibiraChannelsWidget;
@@ -77,6 +78,8 @@ class HibiraPlugin implements Plugin
     protected ?string $waitingRoomsNavigationGroup = null;
 
     protected ?\Closure $waitingRoomsAuthorization = null;
+
+    protected bool $hasSecretary = false;
 
     /** @var array<string, mixed> */
     protected array $echoOptions = [];
@@ -315,8 +318,34 @@ class HibiraPlugin implements Plugin
         return $this->waitingRoomsAuthorization === null || (bool) ($this->waitingRoomsAuthorization)($user);
     }
 
+    /**
+     * Adds Hibira Secretary to the panel: an assistant that works the panel
+     * for the signed-in user, in their browser and with their permissions.
+     * It asks before anything that saves, sends, deletes or pays, and never
+     * touches sign-in or password pages. Set HIBIRA_SECRETARY_KEY and
+     * HIBIRA_SECRETARY_SECRET from the Secretary page on hibira.io/portal,
+     * and add the panel's URL to the workspace's sites.
+     */
+    public function secretary(bool $condition = true): static
+    {
+        $this->hasSecretary = $condition;
+
+        return $this;
+    }
+
+    public function hasSecretary(): bool
+    {
+        return $this->hasSecretary && filled(config('hibira-filament.secretary.key')) && filled(config('hibira-filament.secretary.secret'));
+    }
+
     public function register(Panel $panel): void
     {
+        if ($this->hasSecretary) {
+            $panel->authenticatedRoutes(function () {
+                Route::post('hibira/secretary/session', [SecretaryController::class, 'session'])->name('hibira.secretary-session');
+            });
+        }
+
         if ($this->hasWaitingRooms) {
             $panel->pages([WaitingRoomsPage::class]);
         }
@@ -387,6 +416,22 @@ class HibiraPlugin implements Plugin
 
     public function boot(Panel $panel): void
     {
+        // Secretary needs no Realtime app.
+        if ($this->hasSecretary()) {
+            FilamentView::registerRenderHook(PanelsRenderHook::BODY_END, function () use ($panel): string {
+                if (! Filament::auth()->check()) {
+                    return '';
+                }
+
+                return view('hibira-filament::secretary', [
+                    'url' => rtrim((string) config('hibira-filament.secretary.url'), '/'),
+                    'key' => config('hibira-filament.secretary.key'),
+                    'session' => route("filament.{$panel->getId()}.hibira.secretary-session", absolute: false),
+                    'lang' => str_replace('_', '-', app()->getLocale()),
+                ])->render();
+            });
+        }
+
         // Booted only for the panel being served, so other panels keep their
         // own Echo settings.
         if (! $this->isConfigured()) {

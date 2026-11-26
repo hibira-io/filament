@@ -8,6 +8,8 @@ class HibiraFilamentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../config/hibira-filament.php', 'hibira-filament');
+
         $this->app->singleton(LiveTables::class);
         $this->app->singleton(JobProgress::class);
         $this->app->singleton(LiveRecords::class);
@@ -23,6 +25,10 @@ class HibiraFilamentServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([Console\FilamentCommand::class]);
+
+            $this->publishes([
+                __DIR__.'/../config/hibira-filament.php' => $this->app->configPath('hibira-filament.php'),
+            ], 'hibira-filament-config');
 
             $this->publishes([
                 __DIR__.'/../resources/lang' => $this->app->langPath('vendor/hibira-filament'),
